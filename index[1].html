@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DG8AB Learn</title>
+    <link rel="icon" href="" type="image/x-icon">
+    <script src="https://js.puter.com/v2/"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .study-guide-section, .quiz-section {
+            transition: opacity 0.5s;
+        }
+        .study-guide-section {
+            display: none;
+        }
+        .messages {
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .message {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            max-width: 70%;
+        }
+        .user-message {
+            background-color: #dcf8c6;
+            margin-left: auto;
+        }
+        .ai-message {
+            background-color: #e5e5ea;
+        }
+        .typing-indicator {
+            display: none;
+            font-style: italic;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        input, button {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        input {
+            width: 75%;
+            margin-right: 2%;
+        }
+        button {
+            width: 22%;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .input-group {
+            display: flex;
+            margin-top: 15px;
+        }
+        .credits {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+        .credits a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        #errorMessages {
+            color: #e74c3c;
+            text-align: center;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .quiz-section {
+            display: none;
+        }
+        .name-input-section {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>DG8AB Learn</h1>
+
+        <!-- Name Input Section -->
+        <div class="name-input-section" id="nameInputSection">
+            <p>Enter your name to get started:</p>
+            <input type="text" id="userNameInput" placeholder="Enter your name" />
+            <button id="submitNameButton">Submit</button>
+        </div>
+
+        <!-- Study Guide and Chat Section -->
+        <div class="study-guide-section" id="studyGuideSection">
+            <div class="messages" id="messagesContainer"></div>
+            <div class="typing-indicator" id="typingIndicator">AI Assistant is typing...</div>
+            <div class="input-group">
+                <input type="text" id="questionInput" placeholder="Ask me anything..." />
+                <button id="askButton">Ask</button>
+            </div>
+            <button id="startQuizButton" style="display: none;">Start Quiz</button>
+            <button id="downloadButton" style="display: none;">Download Study Guide as PDF</button>
+        </div>
+
+        <div class="credits">
+            Created by <a href="https://youtube.com/@servers.dg8ab" target="_blank">Dhruv Gowda</a>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const messagesContainer = document.getElementById('messagesContainer');
+            const questionInput = document.getElementById('questionInput');
+            const askButton = document.getElementById('askButton');
+            const typingIndicator = document.getElementById('typingIndicator');
+            const startQuizButton = document.getElementById('startQuizButton');
+            const downloadButton = document.getElementById('downloadButton');
+            const submitNameButton = document.getElementById('submitNameButton');
+            const userNameInput = document.getElementById('userNameInput');
+            const nameInputSection = document.getElementById('nameInputSection');
+            const studyGuideSection = document.getElementById('studyGuideSection');
+            const errorMessages = document.getElementById('errorMessages');
+            
+            let studyGuideContent = ''; // Store study guide content
+            let quizQuestions = []; // Store quiz questions and answers
+            let currentQuestionIndex = 0; // Track current question in quiz
+            let userName = '';
+
+            // Add message to chat
+            function addMessage(text, isUser = false) {
+                const messageDiv = document.createElement('div');
+                messageDiv.classList.add('message');
+                messageDiv.classList.add(isUser ? 'user-message' : 'ai-message');
+                messageDiv.textContent = text;
+                messagesContainer.appendChild(messageDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+
+            // Show typing indicator
+            function showTypingIndicator() {
+                typingIndicator.style.display = 'block';
+                askButton.disabled = true;
+                questionInput.disabled = true;
+            }
+
+            // Hide typing indicator
+            function hideTypingIndicator() {
+                typingIndicator.style.display = 'none';
+                askButton.disabled = false;
+                questionInput.disabled = false;
+            }
+
+            // Handle study guide creation
+            async function createStudyGuide(topic) {
+                const prompt = `Create a highly detailed study guide for the topic: ${topic}. The guide should be very structured and include sections like Introduction, Key Concepts, Examples, Applications, and a Summary.`;
+
+                try {
+                    // Show typing indicator while generating the study guide
+                    showTypingIndicator();
+                    const response = await puter.ai.chat(prompt, { model: 'o3-mini' });
+                    hideTypingIndicator();
+
+                    if (response && response.message && response.message.content) {
+                        studyGuideContent = response.message.content;
+                        addMessage(studyGuideContent);
+                        addMessage("Click the button below to start your quiz!");
+                        startQuizButton.style.display = "block";
+                        downloadButton.style.display = "block"; // Show download button
+                    } else {
+                        throw new Error('Invalid response format');
+                    }
+                } catch (error) {
+                    hideTypingIndicator();
+                    console.error("Error details:", error);
+                    addMessage('Sorry, I encountered an error. Please try again later.');
+                }
+            }
+
+            // Generate and download the study guide as a PDF
+            function downloadPDF() {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                doc.text(studyGuideContent, 10, 10);
+                doc.save('study_guide.pdf');
+            }
+
+            // Handle quiz
+            function startQuiz() {
+                quizQuestions = [
+                    { question: "What is the formula for the area of a rectangle?", answer: "Area = length × width" },
+                    { question: "What is an acute angle?", answer: "An acute angle is less than 90°" },
+                    { question: "What is the area formula for a circle?", answer: "Area = π × radius²" },
+                    { question: "What is the definition of an obtuse angle?", answer: "An obtuse angle is more than 90° but less than 180°" }
+                ];
+                currentQuestionIndex = 0;
+                askQuizQuestion();
+            }
+
+            // Ask quiz question
+            function askQuizQuestion() {
+                if (currentQuestionIndex < quizQuestions.length) {
+                    const currentQuestion = quizQuestions[currentQuestionIndex];
+                    addMessage(currentQuestion.question);
+                } else {
+                    addMessage("Congratulations! You have completed the quiz.");
+                    addMessage("If you'd like more practice, just ask me!");
+                }
+            }
+
+            // Handle answer submission
+            askButton.addEventListener('click', async () => {
+                const userAnswer = questionInput.value.trim();
+                if (!userAnswer) return;
+
+                // Add user message
+                addMessage(userAnswer, true);
+                questionInput.value = '';
+
+                // Check if the user is asking for a study guide
+                if (userAnswer.toLowerCase().startsWith('study guide:')) {
+                    const topic = userAnswer.slice(12).trim(); // Get the topic after "study guide:"
+                    if (topic) {
+                        addMessage(`Generating study guide for: ${topic}`);
+                        createStudyGuide(topic);
+                    } else {
+                        addMessage("Please provide a topic after 'study guide:'. Example: 'study guide: Area and Angles'.");
+                    }
+                } else if (currentQuestionIndex < quizQuestions.length) {
+                    // If it's a quiz question
+                    const correctAnswer = quizQuestions[currentQuestionIndex].answer;
+                    if (userAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
+                        addMessage("Correct! Well done.");
+                    } else {
+                        addMessage(`Oops, that's not quite right. The correct answer is: "${correctAnswer}"`);
+                    }
+                    currentQuestionIndex++;
+                    askQuizQuestion();
+                } else {
+                    // If not a study guide or quiz question, handle general query
+                    const prompt = `As a DG8AB Learn assistant for ${userName}, I need to provide a helpful, educational response to this question: "${userAnswer}". Please be informative, friendly, and concise.`;
+                    const response = await puter.ai.chat(prompt, { model: 'o3-mini' });
+                    hideTypingIndicator();
+                    if (response && response.message && response.message.content) {
+                        addMessage(response.message.content);
+                    } else {
+                        throw new Error('Invalid response format');
+                    }
+                }
+            });
+
+            // Handle name submission
+            submitNameButton.addEventListener('click', () => {
+                userName = userNameInput.value.trim();
+                if (userName) {
+                    nameInputSection.style.display = 'none'; // Hide name input section
+                    studyGuideSection.style.display = 'block'; // Show study guide section
+                } else {
+                    addMessage("Please enter a valid name to get started.");
+                }
+            });
+
+            // Handle download study guide as PDF
+            downloadButton.addEventListener('click', downloadPDF);
+        });
+    </script>
+</body>
+</html>
